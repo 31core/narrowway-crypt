@@ -38,8 +38,11 @@ struct Args {
     algorithm: Algorithm,
     #[arg(short, long, default_value = "cbc")]
     block_mode: BlockMode,
-    /// Secret key
+    /// Keep source file
     #[arg(short, long)]
+    keep: bool,
+    /// Secret key
+    #[arg(short = 'K', long)]
     key: Option<String>,
     /// Secret key file
     #[arg(short = 'f', long)]
@@ -760,6 +763,10 @@ fn main() -> IOResult<()> {
                 }
             },
         },
+    }
+
+    if !args.keep {
+        std::fs::remove_file(&args.input)?;
     }
 
     Ok(())
