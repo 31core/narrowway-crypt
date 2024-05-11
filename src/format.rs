@@ -1,6 +1,6 @@
-pub const KEY_SIZE_128: u8 = 1;
-pub const KEY_SIZE_192: u8 = 2;
-pub const KEY_SIZE_256: u8 = 3;
+pub const KEY_SIZE_256: u8 = 1;
+pub const KEY_SIZE_384: u8 = 2;
+pub const KEY_SIZE_512: u8 = 3;
 
 pub const BLOCK_MODE_CBC: u8 = 1;
 pub const BLOCK_MODE_ECB: u8 = 2;
