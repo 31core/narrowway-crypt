@@ -32,7 +32,7 @@ enum BlockMode {
 #[derive(Parser)]
 #[command(
     author = "31core",
-    version = "0.1.2",
+    version = "0.1.3",
     about = "NarrowWay encryption/decryption utility"
 )]
 struct Args {
@@ -773,7 +773,7 @@ fn main() -> IOResult<()> {
         },
         Command::Decrypt => {
             if !args.raw {
-                let mut header = [0; 2];
+                let mut header = [0; 8];
                 src.read_exact(&mut header)?;
                 let header = Format::load(&header);
 

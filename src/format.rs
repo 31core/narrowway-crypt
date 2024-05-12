@@ -14,11 +14,15 @@ pub struct Format {
 impl Format {
     pub fn load(bytes: &[u8]) -> Self {
         Self {
-            key_size: bytes[0],
-            block_mode: bytes[1],
+            key_size: bytes[6],
+            block_mode: bytes[7],
         }
     }
     pub fn dump(&self) -> Vec<u8> {
-        vec![self.key_size, self.block_mode]
+        let mut header = b"NWCRY\0".to_vec();
+        header.push(self.key_size);
+        header.push(self.block_mode);
+
+        header
     }
 }
