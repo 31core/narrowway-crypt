@@ -1,4 +1,5 @@
 mod format;
+mod key;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use narrowway::*;
@@ -32,8 +33,8 @@ enum BlockMode {
 #[derive(Parser)]
 #[command(
     author = "31core",
-    version = "0.1.3",
-    about = "NarrowWay encryption/decryption utility"
+    about = "NarrowWay encryption/decryption utility",
+    version
 )]
 struct Args {
     #[command(subcommand)]
@@ -634,149 +635,138 @@ fn main() -> IOResult<()> {
         .truncate(true)
         .open(output_name)?;
 
-    let orig_key;
-
-    if let Some(k) = args.key {
-        orig_key = k;
+    let orig_key = if let Some(k) = args.key {
+        k.as_bytes().to_vec()
     } else {
-        orig_key = std::fs::read_to_string(args.key_file.unwrap())?;
-    }
+        std::fs::read(args.key_file.unwrap())?
+    };
 
     match args.command {
-        Command::Encrypt => match args.algorithm {
-            Algorithm::Narrowway256 => match args.block_mode {
-                BlockMode::Ecb => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_256,
-                                block_mode: BLOCK_MODE_ECB,
-                            }
-                            .dump(),
-                        )?;
-                    }
+        Command::Encrypt => {
+            let salt = rand::random();
+            match args.algorithm {
+                Algorithm::Narrowway256 => match args.block_mode {
+                    BlockMode::Ecb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_256,
+                                    block_mode: BLOCK_MODE_ECB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_256];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)],
-                    );
-                    narrowway256_ecb_encrypt(&mut src, &mut dst, key)?;
-                }
-                BlockMode::Cbc => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_256,
-                                block_mode: BLOCK_MODE_CBC,
-                            }
-                            .dump(),
-                        )?;
+                        let key = key::gen_key_256(salt, &orig_key);
+                        narrowway256_ecb_encrypt(&mut src, &mut dst, key)?;
                     }
+                    BlockMode::Cbc => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_256,
+                                    block_mode: BLOCK_MODE_CBC,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_256];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)],
-                    );
+                        let key = key::gen_key_256(salt, &orig_key);
 
-                    let mut iv = [0; BLOCK_SIZE_256];
-                    for byte in &mut iv {
-                        *byte = rand::random();
+                        let mut iv = [0; BLOCK_SIZE_256];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway256_cbc_encrypt(&mut src, &mut dst, key, iv)?;
                     }
-                    dst.write_all(&iv)?;
-                    narrowway256_cbc_encrypt(&mut src, &mut dst, key, iv)?;
-                }
-            },
-            Algorithm::Narrowway384 => match args.block_mode {
-                BlockMode::Ecb => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_384,
-                                block_mode: BLOCK_MODE_ECB,
-                            }
-                            .dump(),
-                        )?;
-                    }
+                },
+                Algorithm::Narrowway384 => match args.block_mode {
+                    BlockMode::Ecb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_384,
+                                    block_mode: BLOCK_MODE_ECB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_384];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)],
-                    );
-                    narrowway384_ecb_encrypt(&mut src, &mut dst, key)?;
-                }
-                BlockMode::Cbc => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_384,
-                                block_mode: BLOCK_MODE_CBC,
-                            }
-                            .dump(),
-                        )?;
+                        let key = key::gen_key_384(salt, &orig_key);
+                        narrowway384_ecb_encrypt(&mut src, &mut dst, key)?;
                     }
+                    BlockMode::Cbc => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_384,
+                                    block_mode: BLOCK_MODE_CBC,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_384];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)],
-                    );
+                        let key = key::gen_key_384(salt, &orig_key);
 
-                    let mut iv = [0; BLOCK_SIZE_384];
-                    for byte in &mut iv {
-                        *byte = rand::random();
+                        let mut iv = [0; BLOCK_SIZE_384];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway384_cbc_encrypt(&mut src, &mut dst, key, iv)?;
                     }
-                    dst.write_all(&iv)?;
-                    narrowway384_cbc_encrypt(&mut src, &mut dst, key, iv)?;
-                }
-            },
-            Algorithm::Narrowway512 => match args.block_mode {
-                BlockMode::Ecb => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_512,
-                                block_mode: BLOCK_MODE_ECB,
-                            }
-                            .dump(),
-                        )?;
-                    }
+                },
+                Algorithm::Narrowway512 => match args.block_mode {
+                    BlockMode::Ecb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_512,
+                                    block_mode: BLOCK_MODE_ECB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_512];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)],
-                    );
-                    narrowway512_ecb_encrypt(&mut src, &mut dst, key)?;
-                }
-                BlockMode::Cbc => {
-                    if !args.raw {
-                        dst.write_all(
-                            &Format {
-                                key_size: KEY_SIZE_512,
-                                block_mode: BLOCK_MODE_CBC,
-                            }
-                            .dump(),
-                        )?;
+                        let key = key::gen_key_512(salt, &orig_key);
+                        narrowway512_ecb_encrypt(&mut src, &mut dst, key)?;
                     }
+                    BlockMode::Cbc => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_512,
+                                    block_mode: BLOCK_MODE_CBC,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
 
-                    let mut key = [0; BLOCK_SIZE_512];
-                    key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)].copy_from_slice(
-                        &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)],
-                    );
+                        let key = key::gen_key_512(salt, &orig_key);
 
-                    let mut iv = [0; BLOCK_SIZE_512];
-                    for byte in &mut iv {
-                        *byte = rand::random();
+                        let mut iv = [0; BLOCK_SIZE_512];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway512_cbc_encrypt(&mut src, &mut dst, key, iv)?;
                     }
-                    dst.write_all(&iv)?;
-                    narrowway512_cbc_encrypt(&mut src, &mut dst, key, iv)?;
-                }
-            },
-        },
+                },
+            }
+        }
         Command::Decrypt => {
-            if !args.raw {
-                let mut header = [0; 8];
-                src.read_exact(&mut header)?;
-                let header = Format::load(&header);
+            let mut header = [0; 24];
+            src.read_exact(&mut header)?;
+            let header = Format::load(&header);
 
+            if !args.raw {
                 match header.key_size {
                     KEY_SIZE_256 => args.algorithm = Algorithm::Narrowway256,
                     KEY_SIZE_384 => args.algorithm = Algorithm::Narrowway384,
@@ -794,17 +784,11 @@ fn main() -> IOResult<()> {
             match args.algorithm {
                 Algorithm::Narrowway256 => match args.block_mode {
                     BlockMode::Ecb => {
-                        let mut key = [0; BLOCK_SIZE_256];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)],
-                        );
+                        let key = key::gen_key_256(header.salt, &orig_key);
                         narrowway256_ecb_decrypt(&mut src, &mut dst, key)?;
                     }
                     BlockMode::Cbc => {
-                        let mut key = [0; BLOCK_SIZE_256];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_256)],
-                        );
+                        let key = key::gen_key_256(header.salt, &orig_key);
 
                         let mut iv = [0; BLOCK_SIZE_256];
                         src.read_exact(&mut iv)?;
@@ -813,17 +797,11 @@ fn main() -> IOResult<()> {
                 },
                 Algorithm::Narrowway384 => match args.block_mode {
                     BlockMode::Ecb => {
-                        let mut key = [0; BLOCK_SIZE_384];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)],
-                        );
+                        let key = key::gen_key_384(header.salt, &orig_key);
                         narrowway384_ecb_decrypt(&mut src, &mut dst, key)?;
                     }
                     BlockMode::Cbc => {
-                        let mut key = [0; BLOCK_SIZE_384];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_384)],
-                        );
+                        let key = key::gen_key_384(header.salt, &orig_key);
 
                         let mut iv = [0; BLOCK_SIZE_384];
                         src.read_exact(&mut iv)?;
@@ -832,17 +810,11 @@ fn main() -> IOResult<()> {
                 },
                 Algorithm::Narrowway512 => match args.block_mode {
                     BlockMode::Ecb => {
-                        let mut key = [0; BLOCK_SIZE_512];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)],
-                        );
+                        let key = key::gen_key_512(header.salt, &orig_key);
                         narrowway512_ecb_decrypt(&mut src, &mut dst, key)?;
                     }
                     BlockMode::Cbc => {
-                        let mut key = [0; BLOCK_SIZE_512];
-                        key[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)].copy_from_slice(
-                            &orig_key.as_bytes()[..std::cmp::min(orig_key.len(), BLOCK_SIZE_512)],
-                        );
+                        let key = key::gen_key_512(header.salt, &orig_key);
 
                         let mut iv = [0; BLOCK_SIZE_512];
                         src.read_exact(&mut iv)?;
