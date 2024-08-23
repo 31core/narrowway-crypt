@@ -1,4 +1,5 @@
 mod cbc_mode;
+mod cfb_mode;
 pub mod common;
 mod ecb_mode;
 mod format;
@@ -10,6 +11,7 @@ use std::fs::OpenOptions;
 use std::io::{Read, Result as IOResult, Write};
 
 use cbc_mode::*;
+use cfb_mode::*;
 use common::*;
 use ecb_mode::*;
 use ofb_mode::*;
@@ -31,6 +33,7 @@ enum BlockMode {
     Ecb,
     Cbc,
     Ofb,
+    Cfb,
 }
 
 #[derive(Parser)]
@@ -162,6 +165,27 @@ fn main() -> IOResult<()> {
                         dst.write_all(&iv)?;
                         narrowway256_ofb_encrypt(&mut src, &mut dst, key, iv)?;
                     }
+                    BlockMode::Cfb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_256,
+                                    block_mode: BLOCK_MODE_CFB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
+
+                        let key = key::gen_key_256(salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_256];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway256_cfb_encrypt(&mut src, &mut dst, key, iv)?;
+                    }
                 },
                 Algorithm::Narrowway384 => match args.block_mode {
                     BlockMode::Ecb => {
@@ -220,6 +244,27 @@ fn main() -> IOResult<()> {
                         }
                         dst.write_all(&iv)?;
                         narrowway384_ofb_encrypt(&mut src, &mut dst, key, iv)?;
+                    }
+                    BlockMode::Cfb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_384,
+                                    block_mode: BLOCK_MODE_CFB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
+
+                        let key = key::gen_key_384(salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_384];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway384_cfb_encrypt(&mut src, &mut dst, key, iv)?;
                     }
                 },
                 Algorithm::Narrowway512 => match args.block_mode {
@@ -280,6 +325,27 @@ fn main() -> IOResult<()> {
                         dst.write_all(&iv)?;
                         narrowway512_ofb_encrypt(&mut src, &mut dst, key, iv)?;
                     }
+                    BlockMode::Cfb => {
+                        if !args.raw {
+                            dst.write_all(
+                                &Format {
+                                    key_size: KEY_SIZE_512,
+                                    block_mode: BLOCK_MODE_CFB,
+                                    salt,
+                                }
+                                .dump(),
+                            )?;
+                        }
+
+                        let key = key::gen_key_512(salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_512];
+                        for byte in &mut iv {
+                            *byte = rand::random();
+                        }
+                        dst.write_all(&iv)?;
+                        narrowway512_cfb_encrypt(&mut src, &mut dst, key, iv)?;
+                    }
                 },
             }
         }
@@ -300,6 +366,7 @@ fn main() -> IOResult<()> {
                     BLOCK_MODE_CBC => args.block_mode = BlockMode::Cbc,
                     BLOCK_MODE_ECB => args.block_mode = BlockMode::Ecb,
                     BLOCK_MODE_OFB => args.block_mode = BlockMode::Ofb,
+                    BLOCK_MODE_CFB => args.block_mode = BlockMode::Cfb,
                     _ => {}
                 }
             }
@@ -324,6 +391,13 @@ fn main() -> IOResult<()> {
                         src.read_exact(&mut iv)?;
                         narrowway256_ofb_decrypt(&mut src, &mut dst, key, iv)?;
                     }
+                    BlockMode::Cfb => {
+                        let key = key::gen_key_256(header.salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_256];
+                        src.read_exact(&mut iv)?;
+                        narrowway256_cfb_decrypt(&mut src, &mut dst, key, iv)?;
+                    }
                 },
                 Algorithm::Narrowway384 => match args.block_mode {
                     BlockMode::Ecb => {
@@ -344,6 +418,13 @@ fn main() -> IOResult<()> {
                         src.read_exact(&mut iv)?;
                         narrowway384_ofb_decrypt(&mut src, &mut dst, key, iv)?;
                     }
+                    BlockMode::Cfb => {
+                        let key = key::gen_key_384(header.salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_384];
+                        src.read_exact(&mut iv)?;
+                        narrowway384_cfb_decrypt(&mut src, &mut dst, key, iv)?;
+                    }
                 },
                 Algorithm::Narrowway512 => match args.block_mode {
                     BlockMode::Ecb => {
@@ -363,6 +444,13 @@ fn main() -> IOResult<()> {
                         let mut iv = [0; BLOCK_SIZE_512];
                         src.read_exact(&mut iv)?;
                         narrowway512_ofb_decrypt(&mut src, &mut dst, key, iv)?;
+                    }
+                    BlockMode::Cfb => {
+                        let key = key::gen_key_512(header.salt, &orig_key);
+
+                        let mut iv = [0; BLOCK_SIZE_512];
+                        src.read_exact(&mut iv)?;
+                        narrowway512_cfb_decrypt(&mut src, &mut dst, key, iv)?;
                     }
                 },
             }
