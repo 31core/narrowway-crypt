@@ -4,7 +4,7 @@ use std::io::{Read, Result as IOResult, Write};
 
 use crate::common::*;
 
-pub fn narrowway256_cbc_encrypt<R, W>(
+pub fn narrowway256_ofb_encrypt<R, W>(
     src: &mut R,
     dst: &mut W,
     key: [u8; BLOCK_SIZE_256],
@@ -27,19 +27,17 @@ where
             block.copy_from_slice(&blocks[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)]);
 
             pkcs7padding_pad(&mut block, size, BLOCK_SIZE_256);
+            iv = cipher.encrypt(iv);
             for (i, byte) in block.iter_mut().enumerate() {
                 *byte ^= iv[i];
             }
-            let cipher_text = cipher.encrypt(block);
 
             if size < BLOCK_SIZE_256 {
                 dst.write_all(&dst_buf[..BLOCK_SIZE_256 * i])?;
-                dst.write_all(&cipher_text)?;
+                dst.write_all(&block)?;
                 break 'main;
             } else {
-                dst_buf[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)].copy_from_slice(&cipher_text);
-
-                iv = cipher_text;
+                dst_buf[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)].copy_from_slice(&block);
             }
         }
         dst.write_all(&dst_buf[..buf_size])?;
@@ -47,7 +45,7 @@ where
     Ok(())
 }
 
-pub fn narrowway384_cbc_encrypt<R, W>(
+pub fn narrowway384_ofb_encrypt<R, W>(
     src: &mut R,
     dst: &mut W,
     key: [u8; BLOCK_SIZE_384],
@@ -70,19 +68,17 @@ where
             block.copy_from_slice(&blocks[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)]);
 
             pkcs7padding_pad(&mut block, size, BLOCK_SIZE_384);
+            iv = cipher.encrypt(iv);
             for (i, byte) in block.iter_mut().enumerate() {
                 *byte ^= iv[i];
             }
-            let cipher_text = cipher.encrypt(block);
 
             if size < BLOCK_SIZE_384 {
                 dst.write_all(&dst_buf[..BLOCK_SIZE_384 * i])?;
-                dst.write_all(&cipher_text)?;
+                dst.write_all(&block)?;
                 break 'main;
             } else {
-                dst_buf[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)].copy_from_slice(&cipher_text);
-
-                iv = cipher_text;
+                dst_buf[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)].copy_from_slice(&block);
             }
         }
         dst.write_all(&dst_buf)?;
@@ -90,7 +86,7 @@ where
     Ok(())
 }
 
-pub fn narrowway512_cbc_encrypt<R, W>(
+pub fn narrowway512_ofb_encrypt<R, W>(
     src: &mut R,
     dst: &mut W,
     key: [u8; BLOCK_SIZE_512],
@@ -113,19 +109,17 @@ where
             block.copy_from_slice(&blocks[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)]);
 
             pkcs7padding_pad(&mut block, size, BLOCK_SIZE_512);
+            iv = cipher.encrypt(iv);
             for (i, byte) in block.iter_mut().enumerate() {
                 *byte ^= iv[i];
             }
-            let cipher_text = cipher.encrypt(block);
 
             if size < BLOCK_SIZE_512 {
                 dst.write_all(&dst_buf[..BLOCK_SIZE_512 * i])?;
-                dst.write_all(&cipher_text)?;
+                dst.write_all(&block)?;
                 break 'main;
             } else {
-                dst_buf[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)].copy_from_slice(&cipher_text);
-
-                iv = cipher_text;
+                dst_buf[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)].copy_from_slice(&block);
             }
         }
         dst.write_all(&dst_buf)?;
@@ -133,7 +127,7 @@ where
     Ok(())
 }
 
-pub fn narrowway256_cbc_decrypt<R>(
+pub fn narrowway256_ofb_decrypt<R>(
     src: &mut R,
     dst: &mut File,
     key: [u8; BLOCK_SIZE_256],
@@ -144,38 +138,32 @@ where
 {
     let cipher = Cipher256::new(key);
 
-    let mut old_iv = iv;
     let mut block = [0; BLOCK_SIZE_256];
     loop {
         let mut blocks = vec![0; BLOCK_SIZE_256 * BUFF_BLOCKS];
         let buf_size = src.read(&mut blocks)?;
 
         if buf_size == 0 {
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
-            }
-            dst.set_len(dst.metadata()?.len() - plain_text[BLOCK_SIZE_256 - 1] as u64)?;
+            dst.set_len(dst.metadata()?.len() - block[BLOCK_SIZE_256 - 1] as u64)?;
             break;
         }
 
         let mut dst_buf = vec![0; BLOCK_SIZE_256 * BUFF_BLOCKS];
         for i in 0..buf_size / BLOCK_SIZE_256 {
             block.copy_from_slice(&blocks[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)]);
-            old_iv = iv;
-            iv = block;
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
+
+            iv = cipher.encrypt(iv);
+            for (i, byte) in block.iter_mut().enumerate() {
+                *byte ^= iv[i];
             }
-            dst_buf[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)].copy_from_slice(&plain_text);
+            dst_buf[BLOCK_SIZE_256 * i..BLOCK_SIZE_256 * (i + 1)].copy_from_slice(&block);
         }
         dst.write_all(&dst_buf[..buf_size])?;
     }
     Ok(())
 }
 
-pub fn narrowway384_cbc_decrypt<R>(
+pub fn narrowway384_ofb_decrypt<R>(
     src: &mut R,
     dst: &mut File,
     key: [u8; BLOCK_SIZE_384],
@@ -186,38 +174,32 @@ where
 {
     let cipher = Cipher384::new(key);
 
-    let mut old_iv = iv;
     let mut block = [0; BLOCK_SIZE_384];
     loop {
         let mut blocks = vec![0; BLOCK_SIZE_384 * BUFF_BLOCKS];
         let buf_size = src.read(&mut blocks)?;
 
         if buf_size == 0 {
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
-            }
-            dst.set_len(dst.metadata()?.len() - plain_text[BLOCK_SIZE_384 - 1] as u64)?;
+            dst.set_len(dst.metadata()?.len() - block[BLOCK_SIZE_384 - 1] as u64)?;
             break;
         }
 
         let mut dst_buf = vec![0; BLOCK_SIZE_384 * BUFF_BLOCKS];
         for i in 0..buf_size / BLOCK_SIZE_384 {
             block.copy_from_slice(&blocks[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)]);
-            old_iv = iv;
-            iv = block;
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
+
+            iv = cipher.encrypt(iv);
+            for (i, byte) in block.iter_mut().enumerate() {
+                *byte ^= iv[i];
             }
-            dst_buf[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)].copy_from_slice(&plain_text);
+            dst_buf[BLOCK_SIZE_384 * i..BLOCK_SIZE_384 * (i + 1)].copy_from_slice(&block);
         }
         dst.write_all(&dst_buf[..buf_size])?;
     }
     Ok(())
 }
 
-pub fn narrowway512_cbc_decrypt<R>(
+pub fn narrowway512_ofb_decrypt<R>(
     src: &mut R,
     dst: &mut File,
     key: [u8; BLOCK_SIZE_512],
@@ -228,31 +210,25 @@ where
 {
     let cipher = Cipher512::new(key);
 
-    let mut old_iv = iv;
     let mut block = [0; BLOCK_SIZE_512];
     loop {
         let mut blocks = vec![0; BLOCK_SIZE_512 * BUFF_BLOCKS];
         let buf_size = src.read(&mut blocks)?;
 
         if buf_size == 0 {
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
-            }
-            dst.set_len(dst.metadata()?.len() - plain_text[BLOCK_SIZE_512 - 1] as u64)?;
+            dst.set_len(dst.metadata()?.len() - block[BLOCK_SIZE_512 - 1] as u64)?;
             break;
         }
 
         let mut dst_buf = vec![0; BLOCK_SIZE_512 * BUFF_BLOCKS];
         for i in 0..buf_size / BLOCK_SIZE_512 {
             block.copy_from_slice(&blocks[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)]);
-            old_iv = iv;
-            iv = block;
-            let mut plain_text = cipher.decrypt(block);
-            for (i, byte) in plain_text.iter_mut().enumerate() {
-                *byte ^= old_iv[i];
+
+            iv = cipher.encrypt(iv);
+            for (i, byte) in block.iter_mut().enumerate() {
+                *byte ^= iv[i];
             }
-            dst_buf[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)].copy_from_slice(&plain_text);
+            dst_buf[BLOCK_SIZE_512 * i..BLOCK_SIZE_512 * (i + 1)].copy_from_slice(&block);
         }
         dst.write_all(&dst_buf[..buf_size])?;
     }
