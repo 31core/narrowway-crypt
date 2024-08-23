@@ -6,6 +6,7 @@ pub const BLOCK_MODE_ECB: u8 = 1;
 pub const BLOCK_MODE_CBC: u8 = 2;
 pub const BLOCK_MODE_OFB: u8 = 3;
 pub const BLOCK_MODE_CFB: u8 = 4;
+pub const BLOCK_MODE_CTR: u8 = 5;
 
 #[derive(Default)]
 pub struct Format {
